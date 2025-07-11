@@ -7,12 +7,15 @@ st.title("🎬 Movie Explorer")
 
 title = st.text_input("Enter a movie title")
 
+from nick_api_utils import search_movies, get_watchmode_id_by_imdb, get_streaming_sources
+
 if st.button("Search"):
     if title.strip() == "":
         st.warning("Please enter a movie title.")
     else:
         st.markdown(f"🔎 Searching for: **{title}**...")
-        results = search_movies(title)
+        with st.spinner("Searching..."):
+            results = search_movies(title)
 
         if not results:
             st.error("❌ No results found.")
@@ -29,11 +32,10 @@ if st.button("Search"):
                 reverse=True
             )
 
-
             for movie in sorted_results:
-                title = movie.get('primaryTitle', 'Unknown')
+                movie_title = movie.get('primaryTitle', 'Unknown')
                 year = movie.get('startYear', 'N/A')
-                st.markdown(f"### 🎬 {title} ({year})")
+                st.markdown(f"### 🎬 {movie_title} ({year})")
 
                 # Image handling
                 img_data = movie.get("primaryImage")
@@ -70,4 +72,45 @@ if st.button("Search"):
                     if imdb_url:
                         st.markdown(f"🔗 [IMDb Page]({imdb_url})")
 
+                    
+                    # Watchmode Integration
+                    watchmode_id = get_watchmode_id_by_imdb(movie.get("id"))
+                    if watchmode_id:
+                        sources = get_streaming_sources(watchmode_id)
+                        if sources:
+                        # Filter subscription sources only
+                            sub_sources = [s for s in sources if s.get("type") == "sub"]
+                            if sub_sources:
+                                st.markdown("📺 **Available on:**")
+
+                                # Known platform logos
+                                platform_logos = {
+                                    "Netflix": "https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg",
+                                    "Amazon Prime": "https://upload.wikimedia.org/wikipedia/commons/f/f1/Prime_Video.png",
+                                    "Disney+": "https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg",
+                                    "HBO Max": "https://upload.wikimedia.org/wikipedia/commons/1/17/HBO_Max_Logo.svg",
+                                    "Apple TV+": "https://upload.wikimedia.org/wikipedia/commons/1/1b/Apple_TV_Plus_Logo.svg",
+                                    "Paramount Plus": "https://upload.wikimedia.org/wikipedia/commons/b/bc/Paramount%2B_logo.svg"
+                                }
+
+                                # Deduplicate by platform name
+                                unique_platforms = {}
+                                for s in sub_sources:
+                                    name = s.get("name")
+                                    if name not in unique_platforms:
+                                        unique_platforms[name] = platform_logos.get(name)
+
+                                # Display in a neat grid
+                                cols = st.columns(min(len(unique_platforms), 5))  # Adjust grid size as needed
+
+                                for i, (name, logo) in enumerate(unique_platforms.items()):
+                                    with cols[i % len(cols)]:
+                                        if logo:
+                                            st.image(logo, width=80)
+                                        else:
+                                            st.markdown(f"- {name}")
+
+
+
                 st.markdown("---")
+
